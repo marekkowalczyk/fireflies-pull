@@ -109,11 +109,14 @@ def graphql(query, variables=None):
 def slugify(text):
     """Sanitize text into a lowercase-kebab-case slug.
 
-    Uses the `san` binary if available; falls back to basic ASCII slugification.
+    Uses the `sanitize` binary if available; falls back to basic ASCII slugification.
     """
-    result = subprocess.run(["san", text], capture_output=True, text=True)
-    if result.returncode == 0:
-        return result.stdout.strip()
+    try:
+        result = subprocess.run(["sanitize", text], capture_output=True, text=True)
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except FileNotFoundError:
+        pass
     slug = text.lower()
     slug = re.sub(r"[^a-z0-9]+", "-", slug).strip("-")
     return slug

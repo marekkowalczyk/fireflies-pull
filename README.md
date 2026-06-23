@@ -16,7 +16,7 @@ No timestamps in the body. The `transcript_url` in frontmatter links back to the
 
 - Python 3.6+
 - `FIREFLIES_API_KEY` environment variable ([get yours here](https://app.fireflies.ai/integrations/custom/fireflies))
-- [`san`](https://github.com/marekkowalczyk/sanitize) _(optional)_ — for clean kebab-case filenames; falls back to basic ASCII slugification
+- [`sanitize`](https://github.com/marekkowalczyk/sanitize) _(optional)_ — for clean kebab-case slugs from strings; falls back to basic ASCII slugification
 
 ## Installation
 
