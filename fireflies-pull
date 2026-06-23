@@ -44,7 +44,7 @@ query RecentTranscript {
       keywords
       topics_discussed
     }
-    sentence { speaker_name text }
+    sentences { speaker_name text }
   }
 }
 """
@@ -67,7 +67,7 @@ query TranscriptById($id: String!) {
       keywords
       topics_discussed
     }
-    sentence { speaker_name text }
+    sentences { speaker_name text }
   }
 }
 """
@@ -173,7 +173,8 @@ participants:
     summary = t.get("summary") or {}
     topics = summary.get("topics_discussed") or []
     topics_str = ", ".join(topics) if topics else "-"
-    keywords = summary.get("keywords") or "-"
+    kw_raw = summary.get("keywords") or []
+    keywords = ", ".join(kw_raw) if isinstance(kw_raw, list) else (kw_raw or "-")
 
     summary_block = f"""\
 ## Fireflies AI Summary
@@ -189,7 +190,7 @@ participants:
 {summary.get("action_items") or "-"}"""
 
     # Full transcript: group consecutive sentences from the same speaker
-    sentences = t.get("sentence") or []
+    sentences = t.get("sentences") or []
     lines = []
     current_speaker = None
     current_chunks = []
