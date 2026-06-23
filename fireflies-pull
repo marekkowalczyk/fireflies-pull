@@ -1,0 +1,290 @@
+#!/usr/bin/env python3
+"""fireflies-pull — fetch a Fireflies.ai transcript and save as Pandoc Markdown.
+
+Usage:
+  fireflies-pull                      # fetch most recent transcript
+  fireflies-pull --id ID              # fetch a specific meeting by ID
+  fireflies-pull --output DIR         # save to DIR (default: current directory)
+
+Exit codes:
+  0  success       — transcript file path printed to stdout
+  1  not ready     — transcript exists but AI summary not generated yet
+  2  error         — API error, auth failure, or no transcripts found
+
+Requires: FIREFLIES_API_KEY environment variable.
+Optional: san (https://github.com/marekkowalczyk/sanitize) for clean filenames.
+"""
+
+import json
+import os
+import re
+import subprocess
+import sys
+from datetime import datetime, timezone
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
+
+ENDPOINT = "https://api.fireflies.ai/graphql"
+
+QUERY_RECENT = """
+query RecentTranscript {
+  transcripts(mine: true, limit: 1) {
+    id
+    title
+    date
+    organizer_email
+    participants
+    meeting_attendees { displayName email }
+    speakers { id name }
+    duration
+    transcript_url
+    summary {
+      overview
+      action_items
+      keywords
+      topics_discussed
+    }
+    sentence { speaker_name text }
+  }
+}
+"""
+
+QUERY_BY_ID = """
+query TranscriptById($id: String!) {
+  transcript(id: $id) {
+    id
+    title
+    date
+    organizer_email
+    participants
+    meeting_attendees { displayName email }
+    speakers { id name }
+    duration
+    transcript_url
+    summary {
+      overview
+      action_items
+      keywords
+      topics_discussed
+    }
+    sentence { speaker_name text }
+  }
+}
+"""
+
+
+def graphql(query, variables=None):
+    api_key = os.environ.get("FIREFLIES_API_KEY")
+    if not api_key:
+        print("FIREFLIES_API_KEY not set in environment.", file=sys.stderr)
+        sys.exit(2)
+
+    payload = json.dumps({"query": query, "variables": variables or {}}).encode()
+    req = Request(
+        ENDPOINT,
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        },
+    )
+    try:
+        with urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read())
+    except HTTPError as e:
+        print(f"Fireflies API error: HTTP {e.code}", file=sys.stderr)
+        sys.exit(2)
+    except URLError as e:
+        print(f"Network error: {e.reason}", file=sys.stderr)
+        sys.exit(2)
+
+    errors = result.get("errors")
+    if errors:
+        print(f"GraphQL error: {errors[0].get('message', errors)}", file=sys.stderr)
+        sys.exit(2)
+
+    return result.get("data", {})
+
+
+def slugify(text):
+    """Sanitize text into a lowercase-kebab-case slug.
+
+    Uses the `san` binary if available; falls back to basic ASCII slugification.
+    """
+    result = subprocess.run(["san", text], capture_output=True, text=True)
+    if result.returncode == 0:
+        return result.stdout.strip()
+    slug = text.lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", slug).strip("-")
+    return slug
+
+
+def build_participant_list(t):
+    """Return participant strings, preferring displayName + email pairs."""
+    attendees = t.get("meeting_attendees") or []
+    if attendees:
+        parts = []
+        for a in attendees:
+            name = (a.get("displayName") or "").strip()
+            email = (a.get("email") or "").strip()
+            if name and email:
+                parts.append(f"{name} <{email}>")
+            elif name:
+                parts.append(name)
+            elif email:
+                parts.append(email)
+        if parts:
+            return parts
+    return t.get("participants") or []
+
+
+def build_markdown(t):
+    """Format a Fireflies transcript object as Pandoc Markdown."""
+    date_ms = t.get("date") or 0
+    date_dt = datetime.fromtimestamp(date_ms / 1000, tz=timezone.utc)
+    date_str = date_dt.strftime("%Y-%m-%d")
+
+    title = t.get("title") or "Untitled Meeting"
+    meeting_id = t.get("id", "")
+    transcript_url = t.get("transcript_url", "")
+    duration = int(t.get("duration") or 0)
+    organizer = t.get("organizer_email", "")
+
+    participants = build_participant_list(t)
+    participants_yaml = (
+        "\n".join(f'  - "{p}"' for p in participants) if participants else "  []"
+    )
+
+    frontmatter = f"""\
+---
+title: "{title}"
+date: {date_str}
+document_type: Transcript
+source: fireflies
+meeting_id: "{meeting_id}"
+transcript_url: "{transcript_url}"
+organizer: "{organizer}"
+duration: {duration} min
+participants:
+{participants_yaml}
+---"""
+
+    # Fireflies AI summary — useful supplementary context for downstream processing
+    summary = t.get("summary") or {}
+    topics = summary.get("topics_discussed") or []
+    topics_str = ", ".join(topics) if topics else "-"
+    keywords = summary.get("keywords") or "-"
+
+    summary_block = f"""\
+## Fireflies AI Summary
+
+{summary.get("overview", "-")}
+
+**Topics:** {topics_str}
+
+**Keywords:** {keywords}
+
+### AI Action Items
+
+{summary.get("action_items") or "-"}"""
+
+    # Full transcript: group consecutive sentences from the same speaker
+    sentences = t.get("sentence") or []
+    lines = []
+    current_speaker = None
+    current_chunks = []
+
+    for s in sentences:
+        speaker = (s.get("speaker_name") or "Unknown").strip()
+        text = (s.get("text") or "").strip()
+        if not text:
+            continue
+        if speaker == current_speaker:
+            current_chunks.append(text)
+        else:
+            if current_speaker is not None and current_chunks:
+                lines.append(f"**{current_speaker}:** {' '.join(current_chunks)}")
+            current_speaker = speaker
+            current_chunks = [text]
+
+    if current_speaker and current_chunks:
+        lines.append(f"**{current_speaker}:** {' '.join(current_chunks)}")
+
+    transcript_body = "\n\n".join(lines)
+
+    return date_str, title, f"""\
+{frontmatter}
+
+{summary_block}
+
+## Full Transcript
+
+{transcript_body}
+"""
+
+
+def parse_args(args):
+    meeting_id = None
+    output_dir = "."
+
+    i = 0
+    while i < len(args):
+        if args[i] == "--id":
+            if i + 1 >= len(args):
+                print("--id requires an argument.", file=sys.stderr)
+                sys.exit(2)
+            meeting_id = args[i + 1]
+            i += 2
+        elif args[i] == "--output":
+            if i + 1 >= len(args):
+                print("--output requires an argument.", file=sys.stderr)
+                sys.exit(2)
+            output_dir = args[i + 1]
+            i += 2
+        else:
+            print(f"Unknown argument: {args[i]}", file=sys.stderr)
+            sys.exit(2)
+
+    return meeting_id, output_dir
+
+
+def main():
+    meeting_id, output_dir = parse_args(sys.argv[1:])
+
+    if meeting_id:
+        data = graphql(QUERY_BY_ID, {"id": meeting_id})
+        t = data.get("transcript")
+    else:
+        data = graphql(QUERY_RECENT)
+        transcripts = data.get("transcripts") or []
+        t = transcripts[0] if transcripts else None
+
+    if not t:
+        print("No transcript found.", file=sys.stderr)
+        sys.exit(2)
+
+    summary = t.get("summary")
+    if not summary or not summary.get("overview"):
+        title = t.get("title") or "meeting"
+        print(
+            f'Transcript for "{title}" found but AI summary not ready yet.\n'
+            "Try again in a few minutes.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    date_str, title, content = build_markdown(t)
+    slug = slugify(title)
+    filename = f"{date_str}-{slug}-transcript.md"
+
+    os.makedirs(output_dir, exist_ok=True)
+    outpath = os.path.join(output_dir, filename)
+
+    with open(outpath, "w", encoding="utf-8") as f:
+        f.write(content)
+
+    print(outpath)
+
+
+if __name__ == "__main__":
+    main()
