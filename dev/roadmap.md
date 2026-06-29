@@ -5,15 +5,8 @@
 ### ~~`--list` flag~~ ✓ done 2026-06-29
 ~~Show recent N transcripts so the user can find an ID without opening the Fireflies web UI.~~
 
-### `--stdout`
-Print Markdown to stdout instead of writing a file.
-
-```bash
-fireflies-pull --stdout | llm "summarize action items"
-fireflies-pull --id ID --stdout | pbcopy
-```
-
-Mutually exclusive with `--output`. File path is not printed when `--stdout` is used.
+### ~~`--stdout`~~ ✓ done 2026-06-29
+~~Print Markdown to stdout instead of writing a file.~~ Also added `-o` short flag, `--output -` alias, SIGPIPE handling, and atomic writes.
 
 ### `--no-summary`
 Omit the Fireflies AI Summary block. Useful when feeding raw transcripts to an LLM that will do its own summarization, avoiding summary-of-summary artifacts.

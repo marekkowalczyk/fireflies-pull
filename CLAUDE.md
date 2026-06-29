@@ -9,13 +9,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Running the tool
 
 ```bash
-./fireflies-pull --list         # list 5 most recent transcripts
-./fireflies-pull --list 10      # list 10 most recent transcripts
-./fireflies-pull --last         # download most recent transcript
-./fireflies-pull --id MEETING_ID --output ~/notes/  # download by ID
+./fireflies-pull --list              # list 5 most recent transcripts (tab-separated)
+./fireflies-pull --list 10           # list 10 most recent transcripts
+./fireflies-pull --last              # download most recent transcript
+./fireflies-pull --last --stdout     # write Markdown to stdout
+./fireflies-pull --last -o ~/notes/  # download to specific dir (-o = --output)
+./fireflies-pull --id MEETING_ID -o ~/notes/
 ```
 
 No arguments prints help. No build step, no dependencies to install. Standard library only.
+
+`--list` output is tab-separated: `date\tduration_min\tid\ttitle`.
 
 Requires `FIREFLIES_API_KEY` exported in the environment (e.g. via `~/.env` sourced from `~/.bashrc`).
 
@@ -25,7 +29,7 @@ Everything lives in the single `fireflies-pull` script:
 
 - `graphql(query, variables)` — makes the HTTP POST to the Fireflies GraphQL endpoint, exits on error
 - `cmd_list(n)` — fetches and prints the N most recent transcripts (id, date, duration, title), then exits
-- `fetch_and_save(t, output_dir)` — checks summary readiness, builds markdown, writes file
+- `fetch_and_save(t, output_dir)` — checks summary readiness, builds markdown; writes atomically via mkstemp+rename, or streams to stdout if `output_dir == "-"`
 - `build_participant_list(t)` — prefers `meeting_attendees` displayName+email pairs over raw `participants`
 - `build_markdown(t)` — assembles YAML frontmatter + AI summary block + full transcript; merges consecutive sentences from the same speaker into single paragraphs
 - `slugify(text)` — tries the external `sanitize` binary first, falls back to ASCII kebab-case

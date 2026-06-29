@@ -32,3 +32,18 @@ Continuous improvement log. Each session ends with a brief review: what went wel
 
 **What we'll do differently:**
 - When diagnosing "env var not found" in a subprocess, go straight to `export | grep VAR` rather than checking sourcing chain first
+
+## 2026-06-29 — Unix citizenship: --stdout, -o, atomic writes, SIGPIPE, tab-separated --list
+
+**What went well:**
+- "Unix citizenship" framing produced a clean, prioritized list without scope creep
+- All six changes landed in a single commit with no rework
+- Smoke-testing `parse_args` inline caught the `--stdout`-alone edge case before it could cause confusion
+- Atomic write pattern (`mkstemp` + `rename`) added real robustness with minimal code
+
+**What didn't go well:**
+- CLAUDE.md wasn't updated alongside the code changes — caught only at close, same pattern as session 1
+- Roadmap `--stdout` entry wasn't ticked until close
+
+**What we'll do differently:**
+- After any feature commit, immediately check CLAUDE.md and roadmap for stale entries before moving on
