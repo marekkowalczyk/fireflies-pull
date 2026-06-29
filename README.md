@@ -36,33 +36,38 @@ echo 'export FIREFLIES_API_KEY=your_key_here' >> ~/.env
 ```
 fireflies-pull --list [N]            # list N most recent transcripts (default 5)
 fireflies-pull --last                # download most recent transcript → ./
-fireflies-pull --last --output DIR   # save to DIR
+fireflies-pull --last -o DIR         # save to DIR (-o is short for --output)
+fireflies-pull --last --stdout       # write Markdown to stdout
+fireflies-pull --last --output -     # write Markdown to stdout (alias)
 fireflies-pull --id MEETING_ID       # download a specific meeting by ID
-fireflies-pull --id ID --output DIR  # specific meeting, specific directory
 fireflies-pull --version             # show version
 fireflies-pull --help                # show help
 ```
 
+`--list` output is tab-separated: `date\tduration_min\tid\ttitle` — pipe-friendly for `cut`, `awk`, etc.
+
 Typical workflow:
 
 ```bash
-fireflies-pull --list                # browse recent meetings, note the ID
-fireflies-pull --id ID --output ~/notes/
+fireflies-pull --list                          # browse recent meetings
+fireflies-pull --list | cut -f3 | head -1 \
+  | xargs fireflies-pull --id               # download the most recent by ID
+fireflies-pull --last --stdout | llm "summarize action items"
 ```
 
 ### Exit codes
 
 | Code | Meaning |
 |------|---------|
-| 0 | Success — file path printed to stdout (or list displayed) |
+| 0 | Success — file path printed to stdout (or Markdown if `--stdout`) |
 | 1 | Transcript found but AI summary not ready yet — try again in a few minutes |
 | 2 | Error — API failure, missing key, or no transcripts found |
 
 ### Example
 
 ```bash
-# Fetch latest and pipe the path to your editor
-fireflies-pull --last --output ~/notes/ | xargs mate
+# Fetch latest and open in editor
+fireflies-pull --last -o ~/notes/ | xargs mate
 ```
 
 ## Output format

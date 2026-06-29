@@ -6,6 +6,8 @@ Usage:
   fireflies-pull --last               # download the most recent transcript
   fireflies-pull --id ID              # download a specific meeting by ID
   fireflies-pull --output DIR         # save to DIR (default: current directory)
+  fireflies-pull --output -           # write to stdout
+  fireflies-pull --stdout             # write to stdout (alias)
   fireflies-pull --version            # show version
   fireflies-pull --help               # show this help
 
@@ -26,8 +28,12 @@ Usage:
   fireflies-pull --last               download the most recent transcript
   fireflies-pull --id ID              download a specific meeting by ID
   fireflies-pull --output DIR         save to DIR (default: current directory)
+  fireflies-pull --output -           write Markdown to stdout
+  fireflies-pull --stdout             write Markdown to stdout (alias)
   fireflies-pull --version            show version
   fireflies-pull --help               show this help
+
+--list output is tab-separated: date\\tduration_min\\tid\\ttitle
 
 Requires: FIREFLIES_API_KEY environment variable.\
 """
@@ -35,8 +41,10 @@ Requires: FIREFLIES_API_KEY environment variable.\
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -183,7 +191,7 @@ def cmd_list(n):
         title = t.get("title") or "Untitled Meeting"
         duration = int(t.get("duration") or 0)
         meeting_id = t.get("id", "")
-        print(f"{date_str}  {duration:4d} min  {meeting_id}  {title}")
+        print(f"{date_str}\t{duration}\t{meeting_id}\t{title}")
     sys.exit(0)
 
 
@@ -312,9 +320,12 @@ def parse_args(args):
             mode = "id"
             meeting_id = args[i + 1]
             i += 2
-        elif arg == "--output":
+        elif arg == "--stdout":
+            output_dir = "-"
+            i += 1
+        elif arg in ("--output", "-o"):
             if i + 1 >= len(args):
-                print("--output requires an argument.", file=sys.stderr)
+                print(f"{arg} requires an argument.", file=sys.stderr)
                 sys.exit(2)
             output_dir = args[i + 1]
             i += 2
@@ -340,19 +351,33 @@ def fetch_and_save(t, output_dir):
         sys.exit(1)
 
     date_str, title, content = build_markdown(t)
+
+    if output_dir == "-":
+        sys.stdout.write(content)
+        return
+
     slug = slugify(title)
     filename = f"{date_str}-{slug}-transcript.md"
-
     os.makedirs(output_dir, exist_ok=True)
     outpath = os.path.join(output_dir, filename)
 
-    with open(outpath, "w", encoding="utf-8") as f:
-        f.write(content)
+    fd, tmppath = tempfile.mkstemp(dir=output_dir, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.rename(tmppath, outpath)
+    except Exception:
+        os.unlink(tmppath)
+        raise
 
     print(outpath)
 
 
 def main():
+    # Suppress BrokenPipeError when stdout is closed (e.g. `--list | head`)
+    if hasattr(signal, "SIGPIPE"):
+        signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+
     mode, meeting_id, output_dir, list_n = parse_args(sys.argv[1:])
 
     if mode == "help":
