@@ -6,6 +6,7 @@ Usage:
   fireflies-pull --last               # download the most recent transcript
   fireflies-pull --id ID              # download a specific meeting by ID
   fireflies-pull --output DIR         # save to DIR (default: current directory)
+  fireflies-pull --version            # show version
   fireflies-pull --help               # show this help
 
 Exit codes:
@@ -17,12 +18,15 @@ Requires: FIREFLIES_API_KEY environment variable.
 Optional: sanitize (https://github.com/marekkowalczyk/sanitize) for clean filenames.
 """
 
+VERSION = "1.0.0"
+
 USAGE = """\
 Usage:
   fireflies-pull --list [N]           list N most recent transcripts (default 5)
   fireflies-pull --last               download the most recent transcript
   fireflies-pull --id ID              download a specific meeting by ID
   fireflies-pull --output DIR         save to DIR (default: current directory)
+  fireflies-pull --version            show version
   fireflies-pull --help               show this help
 
 Requires: FIREFLIES_API_KEY environment variable.\
@@ -285,7 +289,10 @@ def parse_args(args):
     i = 0
     while i < len(args):
         arg = args[i]
-        if arg in ("--help", "-h"):
+        if arg in ("--version", "-V"):
+            print(VERSION)
+            sys.exit(0)
+        elif arg in ("--help", "-h"):
             return "help", None, ".", 5
         elif arg == "--list":
             mode = "list"
