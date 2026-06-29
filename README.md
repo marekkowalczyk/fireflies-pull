@@ -34,17 +34,26 @@ echo 'export FIREFLIES_API_KEY=your_key_here' >> ~/.env
 ## Usage
 
 ```
-fireflies-pull                       # fetch most recent transcript → ./
-fireflies-pull --output DIR          # save to DIR
-fireflies-pull --id MEETING_ID       # fetch a specific meeting
+fireflies-pull --list [N]            # list N most recent transcripts (default 5)
+fireflies-pull --last                # download most recent transcript → ./
+fireflies-pull --last --output DIR   # save to DIR
+fireflies-pull --id MEETING_ID       # download a specific meeting by ID
 fireflies-pull --id ID --output DIR  # specific meeting, specific directory
+fireflies-pull --help                # show help
+```
+
+Typical workflow:
+
+```bash
+fireflies-pull --list                # browse recent meetings, note the ID
+fireflies-pull --id ID --output ~/notes/
 ```
 
 ### Exit codes
 
 | Code | Meaning |
 |------|---------|
-| 0 | Success — file path printed to stdout |
+| 0 | Success — file path printed to stdout (or list displayed) |
 | 1 | Transcript found but AI summary not ready yet — try again in a few minutes |
 | 2 | Error — API failure, missing key, or no transcripts found |
 
@@ -52,7 +61,7 @@ fireflies-pull --id ID --output DIR  # specific meeting, specific directory
 
 ```bash
 # Fetch latest and pipe the path to your editor
-fireflies-pull --output ~/notes/ | xargs mate
+fireflies-pull --last --output ~/notes/ | xargs mate
 ```
 
 ## Output format
