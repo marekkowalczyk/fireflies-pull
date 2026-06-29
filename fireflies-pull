@@ -2,17 +2,30 @@
 """fireflies-pull — fetch a Fireflies.ai transcript and save as Pandoc Markdown.
 
 Usage:
-  fireflies-pull                      # fetch most recent transcript
-  fireflies-pull --id ID              # fetch a specific meeting by ID
+  fireflies-pull --list [N]           # list N most recent transcripts (default 5)
+  fireflies-pull --last               # download the most recent transcript
+  fireflies-pull --id ID              # download a specific meeting by ID
   fireflies-pull --output DIR         # save to DIR (default: current directory)
+  fireflies-pull --help               # show this help
 
 Exit codes:
-  0  success       — transcript file path printed to stdout
+  0  success       — transcript file path printed to stdout (or list displayed)
   1  not ready     — transcript exists but AI summary not generated yet
   2  error         — API error, auth failure, or no transcripts found
 
 Requires: FIREFLIES_API_KEY environment variable.
-Optional: san (https://github.com/marekkowalczyk/sanitize) for clean filenames.
+Optional: sanitize (https://github.com/marekkowalczyk/sanitize) for clean filenames.
+"""
+
+USAGE = """\
+Usage:
+  fireflies-pull --list [N]           list N most recent transcripts (default 5)
+  fireflies-pull --last               download the most recent transcript
+  fireflies-pull --id ID              download a specific meeting by ID
+  fireflies-pull --output DIR         save to DIR (default: current directory)
+  fireflies-pull --help               show this help
+
+Requires: FIREFLIES_API_KEY environment variable.\
 """
 
 import json
@@ -25,6 +38,17 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 ENDPOINT = "https://api.fireflies.ai/graphql"
+
+QUERY_LIST = """
+query ListTranscripts($limit: Int!) {
+  transcripts(mine: true, limit: $limit) {
+    id
+    title
+    date
+    duration
+  }
+}
+"""
 
 QUERY_RECENT = """
 query RecentTranscript {
@@ -141,6 +165,24 @@ def build_participant_list(t):
     return t.get("participants") or []
 
 
+def cmd_list(n):
+    """Fetch and print the N most recent transcripts, then exit."""
+    data = graphql(QUERY_LIST, {"limit": n})
+    transcripts = data.get("transcripts") or []
+    if not transcripts:
+        print("No transcripts found.", file=sys.stderr)
+        sys.exit(2)
+    for t in transcripts:
+        date_ms = t.get("date") or 0
+        date_dt = datetime.fromtimestamp(date_ms / 1000, tz=timezone.utc)
+        date_str = date_dt.strftime("%Y-%m-%d")
+        title = t.get("title") or "Untitled Meeting"
+        duration = int(t.get("duration") or 0)
+        meeting_id = t.get("id", "")
+        print(f"{date_str}  {duration:4d} min  {meeting_id}  {title}")
+    sys.exit(0)
+
+
 def build_markdown(t):
     """Format a Fireflies transcript object as Pandoc Markdown."""
     date_ms = t.get("date") or 0
@@ -228,45 +270,58 @@ participants:
 
 
 def parse_args(args):
+    """Return (mode, meeting_id, output_dir, list_n).
+
+    mode is one of: 'help', 'list', 'last', 'id'.
+    """
+    if not args:
+        return "help", None, ".", 5
+
+    mode = None
     meeting_id = None
     output_dir = "."
+    list_n = 5
 
     i = 0
     while i < len(args):
-        if args[i] == "--id":
+        arg = args[i]
+        if arg in ("--help", "-h"):
+            return "help", None, ".", 5
+        elif arg == "--list":
+            mode = "list"
+            # optional integer immediately following
+            if i + 1 < len(args) and args[i + 1].isdigit():
+                list_n = int(args[i + 1])
+                i += 2
+            else:
+                i += 1
+        elif arg == "--last":
+            mode = "last"
+            i += 1
+        elif arg == "--id":
             if i + 1 >= len(args):
                 print("--id requires an argument.", file=sys.stderr)
                 sys.exit(2)
+            mode = "id"
             meeting_id = args[i + 1]
             i += 2
-        elif args[i] == "--output":
+        elif arg == "--output":
             if i + 1 >= len(args):
                 print("--output requires an argument.", file=sys.stderr)
                 sys.exit(2)
             output_dir = args[i + 1]
             i += 2
         else:
-            print(f"Unknown argument: {args[i]}", file=sys.stderr)
+            print(f"Unknown argument: {arg}", file=sys.stderr)
             sys.exit(2)
 
-    return meeting_id, output_dir
+    if mode is None:
+        return "help", None, output_dir, list_n
+
+    return mode, meeting_id, output_dir, list_n
 
 
-def main():
-    meeting_id, output_dir = parse_args(sys.argv[1:])
-
-    if meeting_id:
-        data = graphql(QUERY_BY_ID, {"id": meeting_id})
-        t = data.get("transcript")
-    else:
-        data = graphql(QUERY_RECENT)
-        transcripts = data.get("transcripts") or []
-        t = transcripts[0] if transcripts else None
-
-    if not t:
-        print("No transcript found.", file=sys.stderr)
-        sys.exit(2)
-
+def fetch_and_save(t, output_dir):
     summary = t.get("summary")
     if not summary or not summary.get("overview"):
         title = t.get("title") or "meeting"
@@ -288,6 +343,31 @@ def main():
         f.write(content)
 
     print(outpath)
+
+
+def main():
+    mode, meeting_id, output_dir, list_n = parse_args(sys.argv[1:])
+
+    if mode == "help":
+        print(USAGE)
+        sys.exit(0)
+
+    if mode == "list":
+        cmd_list(list_n)
+
+    if mode == "id":
+        data = graphql(QUERY_BY_ID, {"id": meeting_id})
+        t = data.get("transcript")
+    else:  # mode == "last"
+        data = graphql(QUERY_RECENT)
+        transcripts = data.get("transcripts") or []
+        t = transcripts[0] if transcripts else None
+
+    if not t:
+        print("No transcript found.", file=sys.stderr)
+        sys.exit(2)
+
+    fetch_and_save(t, output_dir)
 
 
 if __name__ == "__main__":
