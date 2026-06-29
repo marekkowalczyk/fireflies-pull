@@ -39,6 +39,7 @@ fireflies-pull --last                # download most recent transcript → ./
 fireflies-pull --last --output DIR   # save to DIR
 fireflies-pull --id MEETING_ID       # download a specific meeting by ID
 fireflies-pull --id ID --output DIR  # specific meeting, specific directory
+fireflies-pull --version             # show version
 fireflies-pull --help                # show help
 ```
 

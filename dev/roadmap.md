@@ -2,20 +2,8 @@
 
 ## Immediate (low effort, high value)
 
-### `--list` flag
-Show recent N transcripts so the user can find an ID without opening the Fireflies web UI.
-
-```
-fireflies-pull --list [N]   # default N=10
-```
-
-Output (tab-separated, pipe-friendly):
-```
-2026-06-23  ASxwZxCstx  Q3 Planning — Product & Engineering
-2026-06-20  BRyzWyDtuy  1:1 Marek / Anna
-```
-
-The `transcripts` query already accepts a `limit` param — needs only a new display path, no new GraphQL fields.
+### ~~`--list` flag~~ ✓ done 2026-06-29
+~~Show recent N transcripts so the user can find an ID without opening the Fireflies web UI.~~
 
 ### `--stdout`
 Print Markdown to stdout instead of writing a file.
