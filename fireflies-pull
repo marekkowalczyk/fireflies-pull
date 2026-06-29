@@ -20,7 +20,7 @@ Requires: FIREFLIES_API_KEY environment variable.
 Optional: sanitize (https://github.com/marekkowalczyk/sanitize) for clean filenames.
 """
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 USAGE = """\
 Usage:
