@@ -76,3 +76,4 @@ fireflies-pull --watch --interval 5 --output ~/notes/meetings/
 
 - `slugify()` raised `FileNotFoundError` when `sanitize` was not on PATH; the fallback never fired. Fixed by wrapping the `subprocess.run` call in `try/except FileNotFoundError`.
 - `slugify()` was calling `san` (file renaming tool) instead of `sanitize` (string sanitizer).
+- Filename doubled the date when the meeting title already started with a date (e.g. `2026-06-30-dec-toc-…` → `2026-06-30-2026-06-30-…`). Fixed by stripping a leading `YYYY-MM-DD-` from the slug before prepending `date_str`.

@@ -47,3 +47,16 @@ Continuous improvement log. Each session ends with a brief review: what went wel
 
 **What we'll do differently:**
 - After any feature commit, immediately check CLAUDE.md and roadmap for stale entries before moving on
+
+## 2026-06-30 — Bug fix: duplicate date prefix in filenames
+
+**What went well:**
+- User caught the edge case immediately from live output; root cause was obvious in one grep
+- Fix was minimal (`re.sub` on one line) and used the already-imported `re` — no new dependencies
+- Full cycle (fix → commit → push) was fast and clean
+
+**What didn't go well:**
+- Nothing significant
+
+**What we'll do differently:**
+- When constructing filenames from user-supplied strings, be defensive about prefixes: if the prefix is about to be prepended, strip it from the slug first
