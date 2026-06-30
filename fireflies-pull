@@ -357,6 +357,9 @@ def fetch_and_save(t, output_dir):
         return
 
     slug = slugify(title)
+    # Strip a leading date prefix (YYYY-MM-DD-) from the slug to avoid doubling
+    # when the meeting title already starts with a date.
+    slug = re.sub(r"^\d{4}-\d{2}-\d{2}-", "", slug)
     filename = f"{date_str}-{slug}-transcript.md"
     os.makedirs(output_dir, exist_ok=True)
     outpath = os.path.join(output_dir, filename)
