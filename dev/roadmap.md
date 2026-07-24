@@ -41,6 +41,43 @@ Append a table to the summary block with per-speaker word count and approximate 
 | Anna          |  1180 |  39 % |
 ```
 
+### Show which transcripts are already downloaded (design 2026-07-24)
+Visually mark, in `fp` (and optionally `--list`), which meetings already exist as
+saved notes — so you don't re-download.
+
+**Match on `meeting_id`, never on filename.** The filename (`{date}-{slug}-transcript.md`)
+is a lossy projection of the title (titles change, slugs collide). The ground truth
+is the `meeting_id:` line already written into every file's YAML frontmatter — so a
+title that changed after download still matches correctly.
+
+Architecture (recommended split):
+- **Data source: scan, not a ledger.** Grep the notes dir(s) for frontmatter
+  `meeting_id` to build the "seen" set. Self-healing (delete a note → auto-unmarked),
+  no writable state, no coupling to the writer. A ledger only wins if downloads are
+  scattered across unknown dirs — they aren't (user picks `-o`).
+- **Location config: `FIREFLIES_NOTES_DIR`** (space/colon list). Unset → no marking,
+  silently (feature degrades to current behavior, zero config).
+- **Placement: opt-in `--seen DIR` (repeatable) in the core; render in `fp`.**
+  `--seen` makes `--list` **append** a trailing status field, leaving the documented
+  `date\tduration\tid\ttitle` columns byte-identical (pipelines and `cut -f3` keep
+  working). Set-building lives in Python (robust, testable); presentation stays in `fp`.
+- **`fp` refinement:** default the scanned dir to `fp`'s own `-o` target (fall back to
+  `FIREFLIES_NOTES_DIR`), so "✓" means "already saved *where I'm about to save*."
+- **Rendering:** `fp` turns the status field into a leading `✓ ` / dimmed row via
+  `fzf --ansi`; core emits no ANSI. Update `--with-nth` for the new display column;
+  ID column and `cut` unchanged.
+
+Performance: non-issue — the `--list` network call dominates (~1 s); a grep over the
+notes dir is sub-100 ms for thousands of files. Add mtime-keyed caching only if a
+library ever gets huge; don't build it preemptively.
+
+Do NOT:
+- match by filename/slug (lossy, title-fragile);
+- make it default-on (needs config; would change the stable `--list` contract) — opt-in only;
+- reorder/reformat the existing 4 `--list` columns (append only);
+- reach for SQLite/a DB (a grep over Markdown is the right weight);
+- conflate with the raw-JSON local cache below ("fetched into cache" ≠ "saved as a note").
+
 ### Rate-limit handling
 The Fireflies free tier allows 50 requests/day. On a 429 response, print a clear message with the reset time (from `Retry-After` header if present) and exit 2.
 
