@@ -38,6 +38,7 @@ Usage:
 Requires: FIREFLIES_API_KEY environment variable.\
 """
 
+import gzip
 import json
 import os
 import re
@@ -122,11 +123,18 @@ def graphql(query, variables=None):
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
+            # Ask for gzip; large transcripts compress ~4x. Decoded in-memory below.
+            "Accept-Encoding": "gzip",
         },
     )
     try:
         with urlopen(req, timeout=30) as resp:
-            result = json.loads(resp.read())
+            raw = resp.read()
+            # urllib does not auto-decompress. If the server honored gzip,
+            # inflate in-memory — nothing ever touches disk.
+            if resp.headers.get("Content-Encoding", "").lower() == "gzip":
+                raw = gzip.decompress(raw)
+            result = json.loads(raw)
     except HTTPError as e:
         print(f"Fireflies API error: HTTP {e.code}", file=sys.stderr)
         sys.exit(2)
