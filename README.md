@@ -23,6 +23,7 @@ No timestamps in the body. The `transcript_url` in frontmatter links back to the
 ```bash
 git clone https://github.com/marekkowalczyk/fireflies-pull.git
 ln -s "$PWD/fireflies-pull/fireflies-pull" /usr/local/bin/fireflies-pull
+ln -s "$PWD/fireflies-pull/fp" /usr/local/bin/fp   # optional fzf picker (see below)
 ```
 
 Add your API key to your shell environment:
@@ -45,6 +46,20 @@ fireflies-pull --help                # show help
 ```
 
 `--list` output is tab-separated: `date\tduration_min\tid\ttitle` — pipe-friendly for `cut`, `awk`, etc.
+
+### `fp` — interactive fzf picker
+
+`fp` is a small companion script (POSIX `sh`, requires [`fzf`](https://github.com/junegunn/fzf)) that pipes the recent-transcript list through fzf so you search by date/title instead of copying meeting IDs:
+
+```
+fp                 # pick from the 30 most recent, download to ./
+fp 50              # list 50 instead of 30
+fp -o ~/notes/     # forward flags to the download (e.g. -o DIR, --stdout)
+fp 50 -o ~/notes/  # combine: list 50, save selection to ~/notes/
+fp -h              # help
+```
+
+In the picker: type to filter, `TAB` to mark several (multi-select downloads all), `Enter` to download, `Esc` to cancel. The meeting ID is hidden from the list but recovered automatically for the download.
 
 Typical workflow:
 

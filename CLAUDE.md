@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `fireflies-pull` is a single-file Python CLI tool (the `fireflies-pull` script, no `.py` extension) that fetches a Fireflies.ai meeting transcript via GraphQL and writes it as Pandoc Markdown.
 
+`fp` is a small POSIX-`sh` companion script (same repo, separately symlinked) that pipes `fireflies-pull --list` through `fzf` for interactive title/date search, then downloads the selection(s) via `fireflies-pull --id`. It shells out to `fireflies-pull` on PATH — no shared code — keeping the Python tool dependency-free and fzf-agnostic. Requires `fzf`; degrades with a clear error if absent.
+
 ## Running the tool
 
 ```bash
