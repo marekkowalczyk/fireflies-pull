@@ -23,7 +23,7 @@ Contract (for wrappers such as `fp`): `--forwardable-flags` prints the flags
 safe to forward to `--id` (one per line); see FORWARDABLE_FLAGS below.
 """
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 
 # The flags that operate on a download's *output* and are therefore safe for a
 # wrapper (e.g. the `fp` picker) to forward verbatim to `fireflies-pull --id`.

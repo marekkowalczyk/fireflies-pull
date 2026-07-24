@@ -26,7 +26,7 @@
 # Requires: fzf, and `fireflies-pull` on PATH (FIREFLIES_API_KEY in env).
 set -u
 
-VERSION=1.2.0
+VERSION=1.2.1
 
 case "${1:-}" in
   -h|--help)
