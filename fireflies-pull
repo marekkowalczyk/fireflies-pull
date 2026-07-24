@@ -373,7 +373,7 @@ def fetch_and_save(t, output_dir):
         os.unlink(tmppath)
         raise
 
-    print(outpath)
+    print(os.path.normpath(outpath))
 
 
 def main():
