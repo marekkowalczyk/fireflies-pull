@@ -57,9 +57,12 @@ fp 50              # list 50 instead of 30
 fp -o ~/notes/     # forward flags to the download (e.g. -o DIR, --stdout)
 fp 50 -o ~/notes/  # combine: list 50, save selection to ~/notes/
 fp -h              # help
+fp -V              # version
 ```
 
 In the picker: type to filter, `TAB` to mark several (multi-select downloads all), `Enter` to download, `Esc` to cancel. The meeting ID is hidden from the list but recovered automatically for the download.
+
+`fp` validates its arguments up front, before it fetches or opens the picker: an unknown flag (or a typo like `--outpt`) fails immediately with a clear message instead of after you've already picked a transcript. It forwards only the download-output flags — `-o`/`--output`/`--stdout` — to `fireflies-pull`; mode flags such as `--last` are rejected, since forwarding them would override the transcript you selected.
 
 Typical workflow:
 
@@ -122,6 +125,20 @@ participants:
 - Business/Enterprise: 60 requests/minute
 
 One `fireflies-pull` invocation = one API request.
+
+## Development
+
+`fireflies-pull` and `fp` share no code. `fireflies-pull` is a self-contained, dependency-free Python tool that never knows about `fp` or `fzf`; `fp` is a thin `sh` wrapper that depends on `fireflies-pull` through its **CLI contract** — the tab-separated `--list` format and the set of download flags safe to forward. That contract is the coupling between them, so it is guarded rather than trusted:
+
+- `fireflies-pull` owns the authoritative set as the `FORWARDABLE_FLAGS` constant and exposes it via `fireflies-pull --forwardable-flags` (a machine-readable line list; needs no API key).
+- `fp` keeps a matching allowlist inline (between the `FORWARDABLE` sentinels), so it can validate arguments instantly without shelling out.
+- `dev/check-flag-parity.sh` proves the two agree and fails loudly on drift. Run it before committing a flag change:
+
+  ```bash
+  dev/check-flag-parity.sh
+  ```
+
+When you add a download flag to `fireflies-pull`, add it to `FORWARDABLE_FLAGS` and to `fp`'s allowlist; the check will remind you if you forget one. See `CLAUDE.md` for the full "one-directional independence" rule.
 
 ## License
 

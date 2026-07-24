@@ -10,6 +10,7 @@
 #   fp -o ~/notes/     forward flags to the download (e.g. -o DIR, --stdout)
 #   fp 50 -o ~/notes/  combine: list 50, save selection to ~/notes/
 #   fp -h              show this help
+#   fp -V              show version
 #
 # In the picker: type to filter, TAB to mark several (multi-select),
 # Enter to download, Esc to cancel.
@@ -25,13 +26,61 @@
 # Requires: fzf, and `fireflies-pull` on PATH (FIREFLIES_API_KEY in env).
 set -u
 
+VERSION=1.2.0
+
 case "${1:-}" in
   -h|--help)
     # Print the contiguous comment header (skip the shebang), stripping "# ".
     awk 'NR>1 && /^#/ { sub(/^# ?/, ""); print; next } NR>1 { exit }' "$0"
     exit 0
     ;;
+  -V|--version)
+    echo "fp $VERSION"
+    exit 0
+    ;;
 esac
+
+# Parse and validate arguments up front — before any dependency/TTY probing or
+# network call — so a typo is reported as a typo regardless of environment, and
+# instantly rather than after you've fetched the list and picked from it.
+#
+# A leading plain-integer arg is the list size; the rest is forwarded to the
+# per-transcript download (e.g. -o DIR, --stdout).
+limit=30
+case "${1:-}" in
+  '' | *[!0-9]*) : ;;   # absent or not a bare number — leave default
+  *) limit=$1; shift ;;
+esac
+
+# fp only forwards the download flags it documents; anything else is rejected
+# here rather than silently handed to `fireflies-pull --id`, which would only
+# error at the very end of the flow. We rebuild "$@" as the exact, validated
+# forward list (rotate idiom: append the accepted token(s), shift past them,
+# loop $end times).
+#
+# The accepted flags below MUST match `fireflies-pull --forwardable-flags`.
+# dev/check-flag-parity.sh proves it; the FORWARDABLE sentinels mark the set it
+# reads, so keep them wrapping exactly the case arms that accept a flag.
+end=$#
+i=0
+while [ "$i" -lt "$end" ]; do
+  case $1 in
+    # FORWARDABLE-START (kept in sync with fireflies-pull; see dev/check-flag-parity.sh)
+    --stdout)
+      set -- "$@" "$1"; shift; i=$((i + 1)) ;;
+    -o | --output)
+      if [ $# -lt 2 ]; then
+        echo "fp: $1 requires an argument (an output directory)." >&2
+        exit 2
+      fi
+      set -- "$@" "$1" "$2"; shift 2; i=$((i + 2)) ;;
+    # FORWARDABLE-END
+    *)
+      echo "fp: unknown option '$1'" >&2
+      echo "fp: usage: fp [N] [-o DIR | --output DIR | --stdout]  (see 'fp -h')" >&2
+      exit 2 ;;
+  esac
+done
 
 command -v fzf >/dev/null 2>&1 || {
   echo "fp: fzf not found — install it (e.g. brew install fzf)" >&2
@@ -49,14 +98,6 @@ if ! (exec </dev/tty) 2>/dev/null; then
   echo "fp: no controlling terminal — fp is interactive and needs a TTY for fzf." >&2
   exit 2
 fi
-
-# A leading plain-integer arg is the list size; the rest is forwarded to the
-# per-transcript download (e.g. -o DIR, --stdout).
-limit=30
-case "${1:-}" in
-  '' | *[!0-9]*) : ;;   # absent or not a bare number — leave default
-  *) limit=$1; shift ;;
-esac
 
 # Fetch the list first so a fetch failure (missing key, no transcripts, network)
 # propagates fireflies-pull's own exit code instead of being masked by the pipe.
