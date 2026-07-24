@@ -60,3 +60,23 @@ Continuous improvement log. Each session ends with a brief review: what went wel
 
 **What we'll do differently:**
 - When constructing filenames from user-supplied strings, be defensive about prefixes: if the prefix is about to be prepended, strip it from the slug first
+
+## 2026-07-24 — fp --version fix, up-front validation, flag-parity guard, 1.2.1 release
+
+**What went well:**
+- Diagnosed the `fp --version` bug from a single screenshot before being told what was wrong — read the exit-0-then-picker behavior as a fall-through, confirmed against the script
+- The Socratic design thread (why `-V` not `-v`, "is no-shared-code sensible", "config file?", "runtime `--forwardable-flags`?", "do we need a hook?") landed on a *proportionate* solution each time — resisted over-engineering with concrete reasons (runtime derivation breaks the validate-first property + adds version-skew fallback; a shared config relocates drift rather than removing it; a per-commit hook guards a rare event and isn't portable without a dependency)
+- Got argument-parsing *order* right: moved validation ahead of the dependency/TTY probes so a typo is reported as a typo regardless of environment
+- Proved the parity check by *injecting* drift (`--format` → exit 1), not just confirming it passes — tested the failure path, not only the happy path
+- Applied the long-recurring lesson (sessions 1 & 3): CLAUDE.md was updated *alongside* the code this time, not at close
+- Release ritual followed cleanly: ran the parity gate first, split feat/bump commits, annotated tag, pushed branch + tag
+
+**What didn't go well:**
+- The parity script shipped two avoidable bugs to its first run, both in a script explicitly marked `#!/usr/bin/env sh`: bashism process substitution `diff <(...) <(...)`, and an over-broad `awk` that scraped `--` (from `set --`) and `-lt` (from `[ ... -lt ]`) out of the arms' *code* lines instead of only the case labels
+- Reached for GNU-only tool flags on darwin — `cat -A` failed; had to redo with `sed -n l`. Same portability class as the bashism
+- Scratch cleanup used `rm` (aliased to `rm -i`), which hung waiting for a prompt and got backgrounded — should have used `rm -f`
+
+**What we'll do differently:**
+- In a `#!/usr/bin/env sh` script, treat bashisms (`<()`, here-strings, `[[ ]]`) as errors by reflex; use temp files. Run the script (not just `sh -n`) before wiring it into anything
+- On macOS, don't assume GNU tools: prefer portable equivalents (`sed -n l` over `cat -A`, `od -c` for bytes) and always `sed -i ''` with the explicit empty suffix
+- Use `rm -f` for scratch/temp cleanup to avoid interactive `-i` hangs
